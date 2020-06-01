@@ -1,11 +1,16 @@
 package com.taobao.arthas.boot;
 
 import com.taobao.arthas.common.AnsiLog;
+
+import com.taobao.arthas.common.SocketUtils;
+import com.taobao.arthas.common.UsageRender;
 import com.taobao.middleware.cli.CLI;
 import com.taobao.middleware.cli.CommandLine;
+import com.taobao.middleware.cli.UsageMessageFormatter;
 import com.taobao.middleware.cli.annotations.*;
 
 import java.io.File;
+import java.net.Socket;
 import java.util.Arrays;
 
 /**
@@ -59,13 +64,34 @@ public class BootstrapTest {
 
     private String command;
 
+    public boolean isVerbose() {
+        return verbose;
+    }
+
+    public void setVerbose(boolean verbose) {
+        this.verbose = verbose;
+    }
+
+    private String select;
+
+    public String getSelect() {
+        return select;
+    }
+
+    public void setSelect(String select) {
+        this.select = select;
+    }
+
     public long getPid() {
         return pid;
     }
 
+    @Argument(argName = "pid", index = 0, required = false)
+    @Description("Target pid")
     public void setPid(long pid) {
         this.pid = pid;
     }
+
 
     public String getTargetIp() {
         return targetIp;
@@ -128,17 +154,45 @@ public class BootstrapTest {
         CLI cli = CLIConfigurator.define(BootstrapTest.class);
         CommandLine commandLine = cli.parse(Arrays.asList(args));
         System.out.println(commandLine);
-  try {
-      CLIConfigurator.inject(commandLine, bootstrapTest);
-  }catch (Throwable e){
-      e.printStackTrace();
-      System.out.println(usage(CLI cli));
-  }
+        try {
+            CLIConfigurator.inject(commandLine, bootstrapTest);
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
 
+        //检查端口是否被占用
+        long telnetPortPid = -1;
+        long httpPortPid = -1;
+        int telnentPort = bootstrapTest.getTelnentPort();
+        if (bootstrapTest.getTelnentPort() > 0) {
+            telnetPortPid = SocketUtils.findTcpListenProcess(bootstrapTest.telnentPort);
+            System.out.println(telnetPortPid);
+            if (telnetPortPid > 0) {
+                AnsiLog.info("Process {} already using port{}", telnetPortPid, bootstrapTest.getTelnentPort());
+            }
+        }
+        if (bootstrapTest.getHttpPort() > 0) {
+            httpPortPid = SocketUtils.findTcpListenProcess(bootstrapTest.getHttpPort());
+            if (httpPortPid > 0) {
+                AnsiLog.info("Process {} already using port{}", httpPortPid, bootstrapTest.getHttpPort());
+            }
+        }
+        long pid = bootstrapTest.getPid();
+        AnsiLog.info("获得pid" + pid);
+        if (pid < 0) {
+            long select = ProcessUtils.select(bootstrapTest.verbose, telnetPortPid, bootstrapTest.select);
+            System.out.println("选择的pid：" + select);
+
+        }
 
 
     }
-    private static String  usage(CLI cli){
 
+    private static String usage(CLI cli) {
+        StringBuilder usageStringBuilder = new StringBuilder();
+        UsageMessageFormatter usageMessageFormatter = new UsageMessageFormatter();
+        usageMessageFormatter.setOptionComparator(null);
+        cli.usage(usageStringBuilder, usageMessageFormatter);
+        return UsageRender.render(usageStringBuilder.toString());
     }
 }

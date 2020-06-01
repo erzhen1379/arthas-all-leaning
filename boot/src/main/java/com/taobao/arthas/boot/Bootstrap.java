@@ -352,7 +352,7 @@ public class Bootstrap {
         }
 
         long pid = bootstrap.getPid();
-        AnsiLog.info("获得进程id");
+        AnsiLog.info("获得进程id"+pid);
         // select pid
         if (pid < 0) {
             try {
